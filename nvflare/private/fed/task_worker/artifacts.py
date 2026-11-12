@@ -116,7 +116,7 @@ class _TensorFileSink:
 
             def write(stream):
                 output = _PayloadWriter(stream, remaining)
-                output.write(save({item_id: tensor}))
+                output.write(save({item_id: tensor.contiguous()}))
                 details.update(size=output.size, sha256=output.digest.hexdigest())
 
             _publish_exclusive(self.directory, file_name, write)

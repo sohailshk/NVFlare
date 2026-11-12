@@ -56,6 +56,11 @@ def cleanup_active_disk_tensor_downloads(reason: str = "download aborted", root_
             consumer.cleanup(cancel_reason=reason)
 
 
+def _save_tensor(key, tensor) -> bytes:
+    # safetensors rejects non-contiguous tensors (e.g. channels_last weights, transposed views)
+    return save_tensors({key: tensor.contiguous()})
+
+
 class TensorDownloadable(CacheableObject):
     """Downloadable over a dict of tensors or disk-backed lazy tensor refs."""
 
@@ -86,7 +91,7 @@ class TensorDownloadable(CacheableObject):
         tensor = base_obj[key]
         if isinstance(tensor, _LazyRef):
             tensor = tensor.materialize()
-        return save_tensors({key: tensor})
+        return _save_tensor(key, tensor)
 
     def prefetch_item(self, index: int):
         with self._prefetch_lock:
@@ -99,7 +104,7 @@ class TensorDownloadable(CacheableObject):
             if isinstance(base_obj[key], _LazyRef):
                 # Avoid retaining another tensor or serialized payload ahead of the receiver.
                 return
-            future = stream_thread_pool.submit(save_tensors, {key: base_obj[key]})
+            future = stream_thread_pool.submit(_save_tensor, key, base_obj[key])
             if future:
                 self._prefetch_futures[index] = future
 

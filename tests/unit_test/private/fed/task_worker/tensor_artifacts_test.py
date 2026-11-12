@@ -226,3 +226,11 @@ def test_tensor_cleanup_refuses_symlinks(payload_store, tmp_path):
     with pytest.raises(ValueError, match="invalid attempt artifact"):
         store.release_payloads(identity)
     assert target.read_bytes() == b"keep"
+
+
+def test_non_contiguous_tensor_round_trips(payload_store):
+    store, identity, _ = payload_store
+    weight = torch.arange(24.0).reshape(2, 3, 2, 2).to(memory_format=torch.channels_last)
+    assert not weight.is_contiguous()
+    store.write_input(identity, Shareable({"w": weight}))
+    assert torch.equal(store.read_input(identity)["w"], weight)

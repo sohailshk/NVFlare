@@ -183,3 +183,47 @@ class TestTensorDownloadableBasic:
         ref = safetensors_refs(str(tmp_path / "model.safetensors"))["w"]
         with pytest.raises(ValueError, match="tensor streaming"):
             TensorDecomposer().native_decompose(ref)
+
+
+class TestNonContiguousTensors:
+    """Non-contiguous tensors (channels_last weights, transposed or sliced views) must be sendable."""
+
+    @staticmethod
+    def _non_contiguous():
+        base = torch.arange(24.0).reshape(2, 3, 4)
+        return {
+            "transposed": base.transpose(0, 2),
+            "sliced": base[:, ::2, :],
+            "channels_last": torch.arange(2 * 3 * 4 * 4.0).reshape(2, 3, 4, 4).to(memory_format=torch.channels_last),
+        }
+
+    @pytest.mark.parametrize("max_chunk_size", [1, 1024])
+    def test_downloadable_produces_non_contiguous_tensors(self, max_chunk_size):
+        tensors = self._non_contiguous()
+        assert not any(t.is_contiguous() for t in tensors.values())
+        downloadable = TensorDownloadable(tensors=tensors, max_chunk_size=max_chunk_size)
+
+        received = {}
+        state = {}
+        for _ in range(len(tensors) + 1):
+            rc, items, state = downloadable.produce(state, "receiver")
+            if rc == ProduceRC.EOF:
+                break
+            assert rc == ProduceRC.OK
+            for item in items:
+                received.update(load_tensors(item))
+        else:
+            pytest.fail("downloadable did not reach EOF")
+
+        assert set(received) == set(tensors)
+        for name, tensor in tensors.items():
+            assert torch.equal(received[name], tensor)
+        downloadable.release()
+
+    def test_native_serialization_of_non_contiguous_tensors(self):
+        from nvflare.app_opt.pt.decomposers import TensorDecomposer
+
+        decomposer = TensorDecomposer()
+        for name, tensor in self._non_contiguous().items():
+            received = decomposer.native_recompose(decomposer.native_decompose(tensor))
+            assert torch.equal(received, tensor), name

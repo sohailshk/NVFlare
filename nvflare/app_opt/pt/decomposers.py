@@ -138,7 +138,8 @@ class TensorDecomposer(ViaDownloaderDecomposer):
         if isinstance(target, _LazyRef):
             raise ValueError("disk-backed tensors require an active Cell and tensor streaming")
         # save the tensor to bytes using safetensors
-        dummy = {"t": target}
+        # safetensors rejects non-contiguous tensors (e.g. channels_last conv weights or transposed views)
+        dummy = {"t": target.contiguous()}
         return save(dummy)
 
     def native_recompose(self, data: bytes, manager: DatumManager = None) -> torch.Tensor:
