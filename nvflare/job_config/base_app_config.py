@@ -88,6 +88,12 @@ class BaseAppConfig(ABC):
         self.additional_params.update(args)
 
     @staticmethod
+    def _check_task_names(tasks):
+        """Reject a bare str: it is iterable, so ``set("train")`` would silently become single-character task names."""
+        if isinstance(tasks, str):
+            raise TypeError(f"tasks must be a list of task names, but got the str {tasks!r}; use [{tasks!r}]")
+
+    @staticmethod
     def _add_task_filter(tasks, filter, taskset_filters: list):
         """Add a filter for a set of tasks.
 
@@ -110,6 +116,10 @@ class BaseAppConfig(ABC):
         """
         if not isinstance(filter, Filter):
             raise RuntimeError(f"filter must be type of Filter, but got {filter.__class__}")
+
+        if tasks is None:
+            tasks = ["*"]  # same default as Filter.add_to_fed_job
+        BaseAppConfig._check_task_names(tasks)
 
         # check whether "tasks" already exist
         tasks = set(tasks)

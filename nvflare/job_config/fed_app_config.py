@@ -35,6 +35,7 @@ class ClientAppConfig(BaseAppConfig):
         if not isinstance(executor, Executor):
             raise RuntimeError(f"workflow must be type of Executor, but got {executor.__class__}")
 
+        self._check_task_names(tasks)
         task_set = set(tasks)
         existing_def = None
         for item in self.executors:

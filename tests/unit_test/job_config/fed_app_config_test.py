@@ -78,3 +78,13 @@ class TestExecutorRegistration:
         config.add_executor(["train"], _in_process_executor())
         with pytest.raises(RuntimeError, match="already exist"):
             config.add_executor(["train"], _PlainExecutor())
+
+
+class TestExecutorTaskNames:
+    def test_bare_str_tasks_rejected(self):
+        config = ClientAppConfig()
+
+        with pytest.raises(TypeError, match="list of task names"):
+            config.add_executor("train", _PlainExecutor())
+
+        assert config.executors == []

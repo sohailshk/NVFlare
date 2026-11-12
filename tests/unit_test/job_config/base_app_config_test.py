@@ -16,6 +16,7 @@ import tempfile
 
 import pytest
 
+from nvflare.app_common.filters.exclude_vars import ExcludeVars
 from nvflare.job_config.base_app_config import BaseAppConfig
 
 
@@ -56,3 +57,23 @@ class TestBaseAppConfig:
         script = "scripts/sample.py"
         with pytest.raises(Exception):
             self.app_config.add_ext_script(script)
+
+    def test_task_filter_registered_for_task_names(self):
+        self.app_config.add_task_result_filter(["train"], ExcludeVars(exclude_vars=["x"]))
+
+        assert [tasks for tasks, _ in self.app_config.task_result_filters] == [{"train"}]
+
+    @pytest.mark.parametrize("add_filter_name", ["add_task_result_filter", "add_task_data_filter"])
+    def test_task_filter_rejects_bare_str_tasks(self, add_filter_name):
+        add_filter = getattr(self.app_config, add_filter_name)
+
+        with pytest.raises(TypeError, match="list of task names"):
+            add_filter("train", ExcludeVars(exclude_vars=["x"]))
+
+        assert self.app_config.task_result_filters == []
+        assert self.app_config.task_data_filters == []
+
+    def test_task_filter_defaults_to_all_tasks_when_tasks_is_none(self):
+        self.app_config.add_task_result_filter(None, ExcludeVars(exclude_vars=["x"]))
+
+        assert [tasks for tasks, _ in self.app_config.task_result_filters] == [{"*"}]
