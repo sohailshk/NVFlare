@@ -49,8 +49,9 @@ class TensorDecomposer(ViaDownloaderDecomposer):
         return torch.Tensor
 
     def supported_aliases(self):
-        # Disk-backed lazy refs travel the wire as the tensors they stand for.
-        return [_LazyRef]
+        # Disk-backed lazy refs travel the wire as tensors. nn.Parameter is a Tensor subclass; FOBS matches exact
+        # types, so send it as a tensor too.
+        return [_LazyRef, torch.nn.Parameter]
 
     def get_download_dot(self) -> int:
         return dots.TENSOR_DOWNLOAD
